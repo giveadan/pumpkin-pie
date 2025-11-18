@@ -1,43 +1,54 @@
 <script setup>
 import { ref } from 'vue'
 
-defineProps({
+const props = defineProps({
   msg: String,
 })
 
-const count = ref(0)
+const displayMsg = ref(props.msg)
+const buttonState = ref('initial') // 'initial', 'yesno', 'hidden'
+
+const handleGreat = () => {
+  displayMsg.value = "That's wonderful."
+  buttonState.value = 'hidden'
+}
+
+const handleJustOkay = () => {
+  displayMsg.value = "Would you like to talk about it?"
+  buttonState.value = 'yesno'
+}
+
+const handleYes = () => {
+  displayMsg.value = "I'm not your therapist."
+  buttonState.value = 'hidden'
+}
+
+const handleNo = () => {
+  displayMsg.value = "Good. It's healthy to keep it bottled in."
+  buttonState.value = 'hidden'
+}
 </script>
 
 <template>
-  <h1>{{ msg }}</h1>
+  <h1>{{ displayMsg }}</h1>
 
-  <div class="card">
-    <button type="button" @click="count++">count is {{ count }}</button>
-    <p>
-      Edit
-      <code>components/HelloWorld.vue</code> to test HMR
-    </p>
+  <div class="card" v-if="buttonState !== 'hidden'">
+    <template v-if="buttonState === 'initial'">
+      <button type="button" @click="handleGreat">Great</button>
+      <button type="button" @click="handleJustOkay">Just okay</button>
+    </template>
+    <template v-else-if="buttonState === 'yesno'">
+      <button type="button" @click="handleYes">Yes</button>
+      <button type="button" @click="handleNo">No</button>
+    </template>
   </div>
-
-  <p>
-    Check out
-    <a href="https://vuejs.org/guide/quick-start.html#local" target="_blank"
-      >create-vue</a
-    >, the official Vue + Vite starter
-  </p>
-  <p>
-    Learn more about IDE Support for Vue in the
-    <a
-      href="https://vuejs.org/guide/scaling-up/tooling.html#ide-support"
-      target="_blank"
-      >Vue Docs Scaling up Guide</a
-    >.
-  </p>
-  <p class="read-the-docs">Click on the Vite and Vue logos to learn more</p>
 </template>
 
 <style scoped>
 .read-the-docs {
   color: #888;
+}
+button {
+  margin: 0 10px;
 }
 </style>
