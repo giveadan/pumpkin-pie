@@ -6,7 +6,7 @@ const props = defineProps({
 })
 
 const displayMsg = ref(props.msg)
-const buttonState = ref('initial') // 'initial', 'joy', 'coworker', 'hidden'
+const buttonState = ref('initial') // 'initial', 'joy', 'coworker', 'ranking', 'hidden'
 
 // Reaction game state
 const gameActive = ref(false)
@@ -17,12 +17,21 @@ const buttonAppearTime = ref(0)
 const showFrowny = ref(false)
 const isCheater = ref(false)
 const userReactionTime = ref(0)
+const showTryAgain = ref(false)
 
 // Just okay flow state
 const showDogImage = ref(false)
 const dogImageUrl = ref('')
 const availableCoworkers = ref(['Jean', 'John', 'Mike', 'Dan', 'Jon'])
 const snarkyMessage = ref('')
+const showCountdown = ref(false)
+const countdownValue = ref(5)
+
+// Ranking system state
+const selectedChoice = ref(null) // Single choice slot
+const availableChoices = ref(['Containerization', 'Mega Monitor', 'Office Snacks', 'Dan'])
+const draggedItem = ref(null)
+const rankingError = ref('')
 
 const getRandomPosition = () => {
   // Generate random position within game area (620px x 220px)
@@ -36,12 +45,16 @@ const getRandomPosition = () => {
   return { top: `${top}px`, left: `${left}px` }
 }
 
-const handleGreat = () => {
-  displayMsg.value = "Lets play a game. Click the button when it appears"
-  buttonState.value = 'hidden'
-  
-  // Start reaction game
+const startReactionGame = () => {
+  // Reset game state
+  gameButtonVisible.value = false
+  isRotating.value = false
+  showFrowny.value = false
+  showTryAgain.value = false
   gameActive.value = true
+  
+  displayMsg.value = "Fast typer, but slow... clicker?"
+  
   const delay = Math.random() * 3000 + 2000 // Random between 2-5 seconds
   
   setTimeout(() => {
@@ -49,6 +62,12 @@ const handleGreat = () => {
     buttonAppearTime.value = Date.now()
     gameButtonVisible.value = true
   }, delay)
+}
+
+const handleGreat = () => {
+  displayMsg.value = "Fast typer, but slow... clicker?"
+  buttonState.value = 'hidden'
+  startReactionGame()
 }
 
 const handleGameButtonClick = (event) => {
@@ -82,22 +101,39 @@ const handleGameButtonClick = (event) => {
       displayMsg.value = `Good job. ${userReactionTime.value} seconds`
     }, 5000)
   } else {
-    // Too slow! Show frowny face
+    // Too slow! Show frowny face and try again option
     gameButtonVisible.value = false
     displayMsg.value = `You're too slow. ${userReactionTime.value} seconds`
     showFrowny.value = true
     isCheater.value = false
     
-    // After animation completes, refresh the page
+    // After animation completes, show try again button
     setTimeout(() => {
-      window.location.reload()
-    }, 3000) // 3 seconds for the emoji to grow and fill the screen
+      showFrowny.value = false
+      showTryAgain.value = true
+    }, 3000) // 3 seconds for the emoji to grow
   }
 }
 
+const handleTryAgain = () => {
+  startReactionGame()
+}
+
 const handleJustOkay = () => {
-  displayMsg.value = "How much joy do you want to experience?"
-  buttonState.value = 'joy'
+  displayMsg.value = "Just wanna have fun."
+  buttonState.value = 'hidden'
+  showCountdown.value = true
+  countdownValue.value = 5
+  
+  const countdownInterval = setInterval(() => {
+    countdownValue.value--
+    
+    if (countdownValue.value <= 0) {
+      clearInterval(countdownInterval)
+      // Redirect to Girls Just Want to Have Fun music video
+      window.location.href = 'https://www.youtube.com/watch?v=PIb6AZdTr-A'
+    }
+  }, 1000)
 }
 
 const fetchInstagramImage = async () => {
@@ -175,15 +211,93 @@ const handleCoworkerSelect = (name) => {
     snarkyMessage.value = snarkyResponses[name] || "Wrong! Try again."
   }
 }
+
+// Ranking system handlers
+const handleNotAChallenge = () => {
+  displayMsg.value = "What's most important to you?"
+  buttonState.value = 'ranking'
+  // Reset ranking state
+  selectedChoice.value = null
+  availableChoices.value = ['Containerization', 'Mega Monitor', 'Office Snacks', 'Dan']
+  rankingError.value = ''
+}
+
+const handleDragStart = (event, choice, source) => {
+  draggedItem.value = { choice, source }
+  event.dataTransfer.effectAllowed = 'move'
+}
+
+const handleDragOver = (event) => {
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+}
+
+const handleDrop = (event) => {
+  event.preventDefault()
+  if (!draggedItem.value) return
+  
+  const { choice, source } = draggedItem.value
+  
+  // If slot already has a choice, swap it back to available
+  if (selectedChoice.value) {
+    availableChoices.value.push(selectedChoice.value)
+  }
+  
+  // Place the dragged choice in the slot
+  selectedChoice.value = choice
+  
+  // Remove from available
+  if (source === 'available') {
+    availableChoices.value = availableChoices.value.filter(c => c !== choice)
+  }
+  
+  draggedItem.value = null
+}
+
+const handleDropToAvailable = (event) => {
+  event.preventDefault()
+  if (!draggedItem.value) return
+  
+  const { choice, source } = draggedItem.value
+  
+  // Only allow moving back from slot to available
+  if (source === 'slot') {
+    selectedChoice.value = null
+    availableChoices.value.push(choice)
+  }
+  
+  draggedItem.value = null
+}
+
+const handleSubmitRanking = () => {
+  // Check if Dan is selected
+  if (selectedChoice.value === 'Dan') {
+    displayMsg.value = "❤️"
+    buttonState.value = 'hidden'
+    rankingError.value = ''
+  } else {
+    // Clear error momentarily to retrigger the shake animation
+    rankingError.value = ''
+    setTimeout(() => {
+      rankingError.value = "Wrong"
+    }, 10)
+  }
+}
 </script>
 
 <template>
   <h1>{{ displayMsg }}</h1>
 
+  <!-- Countdown display -->
+  <div v-if="showCountdown" class="countdown-display">
+    <h2 class="countdown-number">{{ countdownValue }}</h2>
+  </div>
+
   <div class="card" v-if="buttonState !== 'hidden'">
     <template v-if="buttonState === 'initial'">
-      <button type="button" @click="handleGreat">Great</button>
-      <button type="button" @click="handleJustOkay">Just okay</button>
+      <button type="button" @click="handleGreat">Challenge</button>
+      <button type="button" @click="handleNotAChallenge">Challenge 2</button>
+      <button type="button" @click="handleJustOkay">Why</button>
     </template>
     <template v-else-if="buttonState === 'joy'">
       <button type="button" @click="handleTheMost">The most</button>
@@ -204,6 +318,59 @@ const handleCoworkerSelect = (name) => {
         </div>
       </div>
     </template>
+    <template v-else-if="buttonState === 'ranking'">
+      <div class="ranking-container">
+        <p v-if="rankingError" class="ranking-error">{{ rankingError }}</p>
+        
+        <!-- Single choice slot -->
+        <div class="single-choice-slot"
+             @dragover="handleDragOver"
+             @drop="handleDrop"
+        >
+          <div 
+            v-if="selectedChoice"
+            class="ranking-card filled"
+            draggable="true"
+            @dragstart="handleDragStart($event, selectedChoice, 'slot')"
+          >
+            {{ selectedChoice }}
+          </div>
+          <div v-else class="ranking-card empty large">
+            Drop your choice here
+          </div>
+        </div>
+
+        <!-- Available choices -->
+        <div class="available-names">
+          <h3>Available Options:</h3>
+          <div 
+            class="available-names-container"
+            @dragover="handleDragOver"
+            @drop="handleDropToAvailable"
+          >
+            <div 
+              v-for="choice in availableChoices" 
+              :key="choice"
+              class="ranking-card draggable"
+              draggable="true"
+              @dragstart="handleDragStart($event, choice, 'available')"
+            >
+              {{ choice }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit button -->
+        <button type="button" class="submit-ranking" @click="handleSubmitRanking">
+          Submit
+        </button>
+      </div>
+    </template>
+  </div>
+
+  <!-- Try again button after failing reaction game -->
+  <div v-if="showTryAgain" class="card">
+    <button type="button" @click="handleTryAgain">Try again</button>
   </div>
 
   <!-- Dog image display -->
@@ -259,6 +426,32 @@ button {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-10px); }
   75% { transform: translateX(10px); }
+}
+
+.countdown-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 40px 0;
+}
+
+.countdown-number {
+  font-size: 120px;
+  font-weight: bold;
+  color: #646cff;
+  margin: 0;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
 }
 
 .coworker-buttons {
@@ -351,5 +544,106 @@ button {
     font-size: 2000px;
     opacity: 1;
   }
+}
+
+/* Ranking system styles */
+.ranking-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.ranking-error {
+  color: #ff4444;
+  font-weight: bold;
+  font-size: 18px;
+  margin: 0;
+  animation: shake 0.5s;
+}
+
+.single-choice-slot {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.ranking-card {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 16px;
+  text-align: center;
+  min-width: 120px;
+  transition: all 0.2s;
+}
+
+.ranking-card.filled {
+  background-color: #42b983;
+  color: white;
+  cursor: move;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ranking-card.filled:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.ranking-card.empty {
+  background-color: rgba(0, 0, 0, 0.05);
+  border: 2px dashed #ccc;
+  color: #999;
+  cursor: default;
+}
+
+.ranking-card.large {
+  min-width: 250px;
+  padding: 24px 32px;
+  font-size: 18px;
+}
+
+.ranking-card.draggable {
+  background-color: #646cff;
+  color: white;
+  cursor: move;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ranking-card.draggable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.available-names {
+  width: 100%;
+}
+
+.available-names h3 {
+  font-size: 16px;
+  margin: 0 0 12px 0;
+  text-align: center;
+}
+
+.available-names-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  padding: 20px;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  background-color: rgba(0, 0, 0, 0.02);
+  min-height: 60px;
+}
+
+.submit-ranking {
+  padding: 12px 40px;
+  font-size: 18px;
+  font-weight: bold;
+  margin-top: 10px;
 }
 </style>
